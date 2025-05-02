@@ -176,7 +176,12 @@ impl<T: Serialize> Locate for LinkStateChange<T> {
             LinkStateChange::Delete(r) => r.action.metadata.author,
         };
 
-        let mut locs = vec![
+        let base = match self {
+            LinkStateChange::Create(r) => r.action.content.base,
+            LinkStateChange::Delete(r) => r.action.content.base,
+        };
+
+        vec![
             // Author hash
             Location {
                 address: author.into(),
@@ -187,20 +192,14 @@ impl<T: Serialize> Locate for LinkStateChange<T> {
             Location {
                 address: action_hash.into(),
                 context: LocationContext::Record
-            }
-        ];
-            
-        if let LinkStateChange::Delete(record) = self {
-            // Base hash of referenced create link
-            locs.push(
-                Location {
-                    address: record.action.content.base.into(),
-                    context: LocationContext::LinkStateChangeReference
-                }
-            );
-        }
+            },
 
-        return locs;
+            // Base hash of create link
+            Location {
+                address: base.into(),
+                context: LocationContext::Record
+            }
+        ]
     }
 }
 
