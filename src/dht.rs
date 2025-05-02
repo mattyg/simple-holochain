@@ -6,13 +6,13 @@ use blake3::{Hash, hash};
 
 // Layer 1: Basic source chain constructs
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ActionMetadata {
     author: Hash,
     prev_action_hash: Hash,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Action<T: Serialize> {
     metadata: ActionMetadata,
     content: T
@@ -26,20 +26,20 @@ impl<T: Serialize> Action<T> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Record<T: Serialize, E: Serialize> {
     signature: Hash,
     action: Action<T>,
     entry: E
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Empty;
 
 
 // Layer 2: Higher-level abstractions: CRUD Objects, Links, and SourceChain
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct Link<T: Serialize> {
     // The index of this link type in the LinkTypes enum
     type_enum_unit: u8,
@@ -49,7 +49,7 @@ pub struct Link<T: Serialize> {
     tag: T
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct LinkDeleteData {
     base: Hash,
     create_link_hash: Hash
@@ -60,7 +60,7 @@ pub struct LinkDeleteData {
 //
 // This is a higher-level abstraction built upon actions and entries, that provides CRUD (whereas entries only provide "create").
 // I'm renaming this to CrudObject for clarity
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct CrudObject<T: Serialize>(T);
 
 pub struct CrudObjectData<T: Serialize> {
@@ -70,12 +70,8 @@ pub struct CrudObjectData<T: Serialize> {
     data: T
 }
 
-
-// This is a higher-level abstraction, that provides open & close (whereas the source chain only provides "append")
-#[derive(Serialize, Deserialize)]
-pub struct SourceChain;
-
-#[derive(Serialize, Deserialize)]
+// Source Chain is a higher-level abstraction, that provides open & close (whereas the action hash chain only provides "append")
+#[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct SourceChainOpenData {
     author: Hash,
     dna: Hash,
@@ -83,23 +79,89 @@ pub struct SourceChainOpenData {
 }
 
 
+pub struct ValidationReceipt {
+    action_hash: Hash,
+    location_context: LocationContext,
+    validator: Hash,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct WarrantData {
+    action_hash: Hash,
+    
+    // All the location contexts which fail validation
+    location_contexts: Vec<LocationContext>,
+}
+
 // Layer 3: Available state changes to Links, CrudObjects, and SourceChains
 // These sets of state changes must merge to a deterministic end state. Each is a CRDT object.
 
+
+
+#[derive(PartialEq, Eq)]
 pub enum LinkStateChange<T: Serialize> {
     Create(Record<Link<T>, Empty>),
     Delete(Record<LinkDeleteData, Empty>)
 }
 
+
+#[derive(PartialEq, Eq)]
 pub enum CrudObjectStateChange<T: Serialize> {
     Create(Record<Empty, CrudObject<T>>),
     Update(Record<Hash, CrudObject<T>>),
     Delete(Record<Hash, Empty>)
 }
 
+
+#[derive(PartialEq, Eq)]
 pub enum SourceChainStateChange {
     Open(Record<SourceChainOpenData, Empty>),
     Close(Record<Empty, Empty>)
+}
+
+#[derive(PartialEq, Eq, Clone)]
+pub enum WarrantStateChange {
+    Create(Record<WarrantData, Empty>)
+}
+
+
+// Two state changes can be deduplicated.
+// This allows us to drop any state changes as redundant, while still ensuring a deterministic end state.
+// This can reduce the storage load on the DHT for state changes that don't affect the end state, and we don't care about keeping available.
+// If two elements A & B can be deduplicated: returns Some(A) or Some(B), otherwise returns None.
+trait Deduplicate {
+    fn deduplicate(a: Self, b: Self) -> Option<Self> 
+    where Self: Sized {
+        None
+    }
+}
+
+impl<T: Serialize> Deduplicate for LinkStateChange<T> {}
+impl<T: Serialize> Deduplicate for CrudObjectStateChange<T> {}
+impl Deduplicate for SourceChainStateChange {}
+
+// Multiple warrants that apply to the same action can be deduplicated
+// IF one warrant contains all the location contexts of the other
+impl Deduplicate for WarrantStateChange {
+    fn deduplicate(a: Self, b: Self) -> Option<Self> {
+        match (a.clone(), b.clone()) {
+            (Self::Create(record_a), Self::Create(record_b)) => {
+                // A and B are both warranting the same bad action
+                if record_a.action.content.action_hash == record_b.action.content.action_hash {
+                    if record_a.action.content.location_contexts.iter().all(|item| record_b.action.content.location_contexts.contains(item)) {
+                        // B contains all the location contexts of A
+                        return Some(b)
+                    } else if record_b.action.content.location_contexts.iter().all(|item| record_a.action.content.location_contexts.contains(item)) {
+                        // A contains all the location contexts of B
+                        return Some(a)
+                    }
+                }
+                
+                None
+            },
+            _ => None
+        }
+    }
 }
 
 
@@ -117,6 +179,8 @@ impl From<Hash> for Address {
 }
 
 // The context of a location is a hint of what data can we expect to be stored there
+// It is also which sys validation should be run there, because of having some associated dependency data available locally
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub enum LocationContext {
     // All Records by this author are stored here
     Author,
@@ -157,12 +221,12 @@ trait AppValidate {
     }
 }
 
-trait LocateValidate: Locate + SysValidate + AppValidate {}
+trait LocateValidateDeduplicate: Locate + SysValidate + AppValidate + Deduplicate {}
 
 
 // Layer 5: The Dht is a map of location -> list of LocateValidate pub structs
 
-pub struct Dht(HashMap<Location, Vec<Box<dyn LocateValidate>>>);
+pub struct Dht(HashMap<Location, Vec<Box<dyn LocateValidateDeduplicate>>>);
 
 impl<T: Serialize> Locate for LinkStateChange<T> {
     fn locations(&self) -> Vec<Location> {
