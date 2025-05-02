@@ -148,12 +148,23 @@ impl Deduplicate for WarrantStateChange {
             (Self::Create(record_a), Self::Create(record_b)) => {
                 // A and B are both warranting the same bad action
                 if record_a.action.content.action_hash == record_b.action.content.action_hash {
+                    if record_a.action.content.location_contexts == record_b.action.content.location_contexts {
+                        // A and B have the same location contexts
+                        // Pick the one with the "lowest" action hash
+                        if record_a.action.hash().to_hex() <= record_b.action.hash().to_hex() {
+                            return Some(a);
+                        } else {
+                            return Some(b);
+                        }
+                    }
                     if record_a.action.content.location_contexts.iter().all(|item| record_b.action.content.location_contexts.contains(item)) {
                         // B contains all the location contexts of A
                         return Some(b)
                     } else if record_b.action.content.location_contexts.iter().all(|item| record_a.action.content.location_contexts.contains(item)) {
                         // A contains all the location contexts of B
                         return Some(a)
+                    } else {
+                        //
                     }
                 }
                 
