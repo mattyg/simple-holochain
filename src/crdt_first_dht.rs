@@ -171,7 +171,7 @@ trait AddressValidated<H: Hash>: Address {
 trait AddressedValidatedSignedStateChange<H>: SignedStateChange<H> + Address + AddressValidated {}
 
 
-// Layer 5: Address-Context
+// Layer 4.4: Address-Context
 //
 // This is not strictly necessary,
 // but for ease of developer experience, we add an additional concept of Address-Context
@@ -192,7 +192,7 @@ trait AddressedContextValidatedSignedStateChange<H>: AddressedValidatedSignedSta
 
 
 
-// The final product: A DHT of Address-Context-Validated, Signed, CRDT State Changes
+// Layer 5: The final product. A DHT of Address-Context-Validated, Signed, CRDT State Changes
 
 struct AddressedContextValidatedSignedStateChangeDht<H: Hash> {
     // The full set of state changes
