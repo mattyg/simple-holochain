@@ -206,11 +206,11 @@ struct ValidatedAddressedSignedCrdt<H: Hash, S: ValidatedAddressedSignedStateCha
 // then any validation logic which depends on those state changes,
 // should run for that Address.
 
-trait AddressValidated<H: Hash>: Address<H> {
-    fn validate_for_address(&self, address: Address<H>) -> Validation<H>;
+trait AddressValidatedAddressedSignedStateChange<H: Hash, A: Address>: AddressedSignedStateChange<H> + Validate<H> {
+    fn validate_for_address(&self, address: A, dependencies: HashSet<dyn AddressValidatedAddressedSignedStateChange<H>>) -> Validity;
 }
 
-trait AddressValidatedAddressedSignedStateChange<H: Hash, A: Address>: AddressedSignedStateChange<H> + AddressValidated {
+trait AddressValidatedAddressedSignedCrdt<H: Hash, A: Address>: AddressValidatedAddressedSignedStateChange<H> {
     fn get_state_changes(&self) -> HashMap<S>;
     fn insert_state_change(&self, state_change: S) -> H;
     fn merge(&self) -> E;
