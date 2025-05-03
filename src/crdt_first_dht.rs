@@ -150,7 +150,7 @@ trait AddressedValidatedSignedStateChangeDht<H: Hash, A: Address, S: AddressedVa
 }
 
 
-// Layer 4: Address-Validated Signed CRDT State Changes 
+// Layer 4.3: Address-Validated Signed CRDT State Changes 
 //
 // We unify the previous two layers of Addressed and Validated
 //
