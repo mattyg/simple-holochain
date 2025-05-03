@@ -147,7 +147,7 @@ enum ValidationStatus<H: Hash> {
 }
 
 trait ValidatedAddressedSignedStateChange<H: Hash>: AddressedSignedStateChange<H> + Validate<H> {
-    fn validate(&self, dependencies: HashSet<dyn AddressedSignedStateChange<H>>) -> Validity;
+    fn validate(&self, dependencies: HashMap<dyn AddressedSignedStateChange<H>>) -> Validity;
 }
 
 trait ValidatedAddressedSignedStateCrdt: Crdt<H, S: ValidatedAddressedSignedStateChange<H>> {
