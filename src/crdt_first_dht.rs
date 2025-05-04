@@ -50,6 +50,8 @@ struct SignedStateChange<S: StateChange> {
 }
 
 trait SignedStateChange<H: Hash>: StateChange<H> + Sign {
+    fn get_dependency_hashes(&self) -> BTreeSet<H>;
+
     fn get_signature(&self) -> Signature;
     fn get_signing_key(&self) -> SigningKey;
     fn is_signature_valid(&self) -> bool;
@@ -93,7 +95,12 @@ trait Address {
     fn get_addresses(&self) -> Vec<Address>;
 }
 
-trait AddressedSignedStateChange<H: Hash>: SignedStateChange<H> + Address<H> { 
+trait AddressedSignedStateChange<H: Hash>: SignedStateChange<H> + Address<H> {
+    fn get_dependency_hashes(&self) -> BTreeSet<H>;
+    fn get_signature(&self) -> Signature;
+    fn get_signing_key(&self) -> SigningKey;
+    fn is_signature_valid(&self) -> bool;
+
     fn get_addresses(&self) -> Vec<Address>;
 }
 
@@ -147,6 +154,12 @@ enum ValidationStatus<H: Hash> {
 }
 
 trait ValidatedAddressedSignedStateChange<H: Hash>: AddressedSignedStateChange<H> + Validate<H> {
+    fn get_dependency_hashes(&self) -> BTreeSet<H>;
+    fn get_signature(&self) -> Signature;
+    fn get_signing_key(&self) -> SigningKey;
+    fn is_signature_valid(&self) -> bool;
+    fn get_addresses(&self) -> Vec<Address>;
+
     fn validate(&self, dependencies: HashMap<dyn AddressedSignedStateChange<H>>) -> Validity;
 }
 
@@ -207,7 +220,13 @@ struct ValidatedAddressedSignedCrdt<H: Hash, S: ValidatedAddressedSignedStateCha
 // should run for that Address.
 
 trait AddressValidatedAddressedSignedStateChange<H: Hash, A: Address>: AddressedSignedStateChange<H> + Validate<H> {
-    fn validate_for_address(&self, address: A, dependencies: HashSet<dyn AddressValidatedAddressedSignedStateChange<H>>) -> Validity;
+    fn get_dependency_hashes(&self) -> BTreeSet<H>;
+    fn get_signature(&self) -> Signature;
+    fn get_signing_key(&self) -> SigningKey;
+    fn is_signature_valid(&self) -> bool;
+    fn get_addresses(&self) -> Vec<Address>;
+
+    fn validate_for_address(&self, address: A, dependencies: HashMap<dyn AddressValidatedAddressedSignedStateChange<H>>) -> Validity;
 }
 
 trait AddressValidatedAddressedSignedCrdt<H: Hash, A: Address>: AddressValidatedAddressedSignedStateChange<H> {
