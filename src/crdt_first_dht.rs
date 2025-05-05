@@ -89,7 +89,25 @@ struct SignedCrdt<H: Hash, S: SignedStateChange<H>> {
 //
 // We can get a State change from any one of its Addresses.
 
-struct Address(&[u8]);
+enum Address {
+    // This is a standard Address, which specifies a single location
+    Specific(&[u8]),
+
+    // This is a special Address, which has no location.
+    //
+    // This enables globally held data, even in a sharded network,
+    // which may be valuable for some use cases.
+    //
+    // It should be passed down to the network layer, so that every node
+    // includes this address within their gossip arc.
+    //
+    // Additionally the network layer may want to prioritize fetching data at
+    // this Address, as it may contain data critically important to all nodes.
+    // 
+    // For example a State Change that is expected to be widely used as a dependency,
+    // for other State Changes, may want to have the Global Address.
+    Universal,
+}
 
 trait Address {
     fn get_addresses(&self) -> Vec<Address>;
@@ -214,6 +232,8 @@ struct ValidatedAddressedSignedCrdt<H: Hash, S: ValidatedAddressedSignedStateCha
 // This allows us to have different validation logic for each Address,
 // and thus to split up the logic into smaller discrete units,
 // which can be run independantly.
+//
+// A State Change is considered valid, if it is Valid for all its Addresses.
 //
 // If we know that some other state changes have the same Address,
 // then any validation logic which depends on those state changes,
