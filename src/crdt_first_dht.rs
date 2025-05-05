@@ -84,7 +84,7 @@ struct SignedCrdt<H: Hash, S: SignedStateChange<H>> {
 //
 // We defined an Address to distinguish from a Hash:
 // - A State Change only has one Hash (its own)
-// - A State Change have multiple Addresses
+// - A State Change may have multiple Addresses
 // - The Hash and Addresses must both be deterministically generated from the State Change itself
 //
 // We can get a State change from any one of its Addresses.
