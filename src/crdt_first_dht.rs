@@ -49,7 +49,7 @@ struct SignedStateChange<S: StateChange> {
     signing_key: SigningKey,
 }
 
-trait SignedStateChange<H: Hash>: StateChange<H> + Sign {
+trait SignedStateChange<H: Hash>: StateChange<H> {
     fn get_dependency_hashes(&self) -> BTreeSet<H>;
 
     fn get_signature(&self) -> Signature;
